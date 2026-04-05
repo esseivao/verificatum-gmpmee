@@ -20,7 +20,7 @@
 #include <stdio.h>
 #include <gmp.h>
 
-int main()
+int main(void)
 {
   puts(__GMP_CFLAGS);
 }

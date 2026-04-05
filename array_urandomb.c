@@ -21,7 +21,7 @@
 
 void
 gmpmee_array_urandomb(mpz_t *rop, size_t len, gmp_randstate_t state,
-		   unsigned long int n) {
+     unsigned long long n) {
   size_t i;
 
   for (i = 0; i < len; i++)
