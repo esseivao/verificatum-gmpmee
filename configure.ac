@@ -53,7 +53,7 @@ AC_CHECK_HEADERS([gmp.h], ,
 
 # Compile a small program that extracts the compiler flags used to
 # compile GMP.
-${CC} extract_GMP_CFLAGS.c -o extract_GMP_CFLAGS
+${CC} ${CPPFLAGS} ${CFLAGS} ${srcdir}/extract_GMP_CFLAGS.c -o extract_GMP_CFLAGS${EXEEXT}
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_SIZE_T
