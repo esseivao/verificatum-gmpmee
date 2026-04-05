@@ -23,7 +23,7 @@
 int
 gmpmee_millerrabin_once(gmpmee_millerrabin_state state, mpz_t base)
 {
-  unsigned long int i;
+  unsigned long long i;
 
   if (mpz_cmp_ui(state->n, 4) < 0) {
     if (mpz_cmp_ui(state->n, 1) > 0) {
