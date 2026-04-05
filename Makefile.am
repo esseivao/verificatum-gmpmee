@@ -20,6 +20,8 @@
 
 BINDIR = bin
 
+ACLOCAL_AMFLAGS=-I m4
+
 # Figuring out the best compiler/building flags to use for a given
 # platform is difficult. This project uses GMP to implement large
 # integers, so the flags used by GMP to compile should be a good

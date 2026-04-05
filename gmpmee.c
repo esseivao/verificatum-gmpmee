@@ -22,16 +22,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <errno.h>
-#include <inttypes.h>
 
 #include <gmp.h>
 #include "gmpmee.h"
 
 int
-gmpmee_done(clock_t start_time, int64_t interval)
+gmpmee_done(long start_time, long interval)
 {
-  return (clock() - start_time > (clock_t) (interval * (CLOCKS_PER_SEC / 1000)));
+  return (clock() - start_time > interval * (CLOCKS_PER_SEC / 1000));
 }
 
 void
@@ -74,7 +72,7 @@ test_miller_rabin_n(int call, gmp_randstate_t rstate, mpz_t n)
 }
 
 void
-test_miller_rabin(int call, int64_t test_time)
+test_miller_rabin(int call, long test_time)
 {
   int t;
   int i;
@@ -183,7 +181,7 @@ test_spowm_modulus_bitlen(int modulus_bitlen)
 }
 
 void
-test_spowm(int64_t test_time)
+test_spowm(long test_time)
 {
   int t;
   int i;
@@ -203,7 +201,7 @@ test_spowm(int64_t test_time)
 }
 
 void
-test_fpowm(int64_t test_time)
+test_fpowm(long test_time)
 {
 
   int t;
@@ -296,16 +294,12 @@ usage(char *command_name) {
 int
 main(int args, char *argv[])
 {
-  int64_t ms;
+  long ms;
 
   /* LCOV_EXCL_START */
   if (args == 2)
     {
-      char *endptr;
-      errno = 0;
-      ms = strtoll(argv[1], &endptr, 10);
-      if (errno != 0 || endptr == argv[1] || *endptr != '\0'
-          || ms <= 0 || 60000 <= ms) {
+      if (sscanf(argv[1], "%ld", &ms) != 1 || ms <= 0 || 60000 <= ms) {
         fprintf(stderr, "Not an integer! (%s)\n", argv[1]);
         exit(1);
       }
@@ -321,27 +315,27 @@ main(int args, char *argv[])
   printf("\n          TESTING GMPMEE\n\n");
   printf("================================================================\n\n");
 
-  printf("Testing simultaneous exponentiation (%" PRId64 " ms)... ", ms);
+  printf("Testing simultaneous exponentiation (%ld ms)... ", ms);
   test_spowm(ms);
   printf("done.\n");
 
-  printf("Testing fixed base exponentiation (%" PRId64 " ms)... ", ms);
+  printf("Testing fixed base exponentiation (%ld ms)... ", ms);
   test_fpowm(ms);
   printf("done.\n");
 
-  printf("Testing Miller-Rabin (%" PRId64 " ms)... ", ms);
+  printf("Testing Miller-Rabin (%ld ms)... ", ms);
   test_miller_rabin(0, ms);
   printf("done.\n");
 
-  printf("Testing Miller-Rabin safe prime (%" PRId64 " ms)... ", ms);
+  printf("Testing Miller-Rabin safe prime (%ld ms)... ", ms);
   test_miller_rabin(1, ms);
   printf("done.\n");
 
-  printf("Testing Miller-Rabin next (%" PRId64 " ms)... ", ms);
+  printf("Testing Miller-Rabin next (%ld ms)... ", ms);
   test_miller_rabin(2, ms);
   printf("done.\n");
 
-  printf("Testing Miller-Rabin next safe prime (%" PRId64 " ms)... ", ms);
+  printf("Testing Miller-Rabin next safe prime (%ld ms)... ", ms);
   test_miller_rabin(3, ms);
   printf("done.\n\n");
 
