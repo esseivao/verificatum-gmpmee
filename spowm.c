@@ -17,6 +17,7 @@
  * along with GMPMEE. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <limits.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -28,19 +29,26 @@
 static int
 theoretical_block_width(int exponents_bitlen) {
   int res = -1;
-  int est;
+  size_t est;
   int w;
-  int opt_est;
+  int max_w;
+  size_t opt_est;
   int opt_w = 1;
 
-  opt_est = exponents_bitlen;
+  opt_est = (size_t)exponents_bitlen;
+  max_w = (int)(sizeof(size_t) * CHAR_BIT - 1);
+  if (max_w > 49)
+    {
+      max_w = 49;
+    }
 
-  for (w = 2; w < 50; w++)
+  for (w = 2; w <= max_w; w++)
     {
 
       /* Precomputation: 2^w - w - 1
        * Computation: exponents_bitlen/w */
-      est = (1 << w) - w - 1 + exponents_bitlen/w;
+      est = (((size_t)1) << w) - (size_t)w - 1
+        + ((size_t)exponents_bitlen / (size_t)w);
 
       if (est > opt_est)
 	{
