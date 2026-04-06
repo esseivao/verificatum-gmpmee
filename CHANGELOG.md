@@ -55,6 +55,20 @@ object file ABI and callers must still be recompiled.
 
 ### Fixed
 
+- **[Correctness]** Trial-division product constants for the generated 64-bit
+  Miller-Rabin tables are now evaluated in `mp_limb_t` arithmetic from the
+  first factor. This avoids intermediate signed-`int` overflow in expressions
+  such as `3*5*...*53` before the result reaches `mpz_tdiv_ui()`.
+  Affected files: `gen_trialdiv.py`, generated `trialdiv_64.c`,
+  generated `trialdiv_safe_64.c`.
+
+- **[Correctness/Portability]** Trial-division table selection now keys off
+  `ULONG_MAX` instead of `__SIZEOF_INT__`, so the Miller-Rabin code chooses
+  the table width that matches the `unsigned long` width used by
+  `mpz_tdiv_ui()`. This fixes table selection on LLP64 targets such as
+  64-bit Windows and makes unsupported widths fail explicitly at compile time.
+  Affected files: `millerrabin_trial.c`, `millerrabin_safe_trial.c`.
+
 - **[Safety]** Shift-width and integer-overflow undefined behavior in table
   sizing and mask arithmetic. Expressions of the form `1 << block_width` and
   `1 << w` used a signed 32-bit `int` literal `1`. Per C11 §6.5.7¶4, this
@@ -67,6 +81,13 @@ object file ABI and callers must still be recompiled.
   `block_width >= CHAR_BIT * sizeof(size_t)`) were added at each shift site.
   Affected files: `spowm_init.c`, `spowm_clear.c`, `spowm_precomp.c`,
   `spowm.c`, `spowm_table.c`, `fpowm.c`.
+
+- **[Safety]** Exponentiation table setup now fails fast on structurally
+  invalid parameters instead of relying on undefined behavior. Invalid
+  `block_width` values are rejected, `batch_len == 0` for non-empty batched
+  exponentiation aborts immediately, and `len == 0` in batched simultaneous
+  exponentiation now returns the multiplicative identity.
+  Affected files: `spowm_init.c`, `spowm_block_batch.c`, `fpowm_init.c`.
 
 ### Build system
 
