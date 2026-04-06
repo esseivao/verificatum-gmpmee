@@ -32,5 +32,5 @@ gmpmee_millerrabin_init(gmpmee_millerrabin_state state, mpz_t n)
 
   /* Define q and k such that n = q*2^k+1. */
   state->k = mpz_scan1(state->n_minus_1, 0L);
-  mpz_tdiv_q_2exp(state->q, state->n_minus_1, state->k);
+  mpz_tdiv_q_2exp(state->q, state->n_minus_1, (mp_bitcnt_t) state->k);
 }

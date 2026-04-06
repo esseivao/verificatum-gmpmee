@@ -31,7 +31,7 @@ ACLOCAL_AMFLAGS=-I m4
 # macro __GMP_CFLAGS, so writing a program to print the flags is
 # trivial. Our program is compiled during configuration.
 
-GMP_CFLAGS := $(shell ./extract_GMP_CFLAGS)
+GMP_CFLAGS := $(shell ./extract_GMP_CFLAGS$(EXEEXT))
 
 OPTIONAL_FLAGS=-O3
 
@@ -57,9 +57,30 @@ $(BINDIR)/gmpmee-info: scriptmacros.m4 gmpmee-info.src
 # Actual target.
 lib_LTLIBRARIES = libgmpmee.la
 libgmpmee_la_SOURCES = spowm.c spowm_clear.c spowm_precomp.c spowm_init.c spowm_table.c spowm_block_batch.c spowm_naive.c array_alloc.c array_clear_dealloc.c array_urandomb.c array_alloc_init.c fpowm.c fpowm_clear.c fpowm_init.c fpowm_precomp.c fpowm_init_precomp.c millerrabin_init.c millerrabin_next_cand.c millerrabin_clear.c millerrabin_trial.c millerrabin_once.c millerrabin_reps_rs.c millerrabin_rs.c millerrabin_next_rs.c millerrabin_safe_init.c millerrabin_safe_next_cand.c millerrabin_safe_clear.c millerrabin_safe_trial.c millerrabin_safe_reps_rs.c millerrabin_safe_rs.c millerrabin_safe_next_rs.c probab_prime_p_next.c probab_safe_prime_p.c probab_safe_prime_p_next.c
+libgmpmee_la_LDFLAGS = -no-undefined
 
 libgmpmee_la_LIBADD = -lgmp
 gmpmee_LDADD = libgmpmee.la
+
+PYTHON ?= python3
+
+BUILT_SOURCES = trialdiv_32.c trialdiv_64.c trialdiv_safe_32.c trialdiv_safe_64.c
+CLEANFILES = $(BUILT_SOURCES)
+
+trialdiv_32.c: $(srcdir)/gen_trialdiv.py
+	$(PYTHON) $(srcdir)/gen_trialdiv.py 32 > $@
+
+trialdiv_64.c: $(srcdir)/gen_trialdiv.py
+	$(PYTHON) $(srcdir)/gen_trialdiv.py 64 > $@
+
+trialdiv_safe_32.c: $(srcdir)/gen_trialdiv.py
+	$(PYTHON) $(srcdir)/gen_trialdiv.py -safe 32 > $@
+
+trialdiv_safe_64.c: $(srcdir)/gen_trialdiv.py
+	$(PYTHON) $(srcdir)/gen_trialdiv.py -safe 64 > $@
+
+millerrabin_trial.lo: trialdiv_32.c trialdiv_64.c
+millerrabin_safe_trial.lo: trialdiv_safe_32.c trialdiv_safe_64.c
 
 include_HEADERS = gmpmee.h
 gmpmee_SOURCES = gmpmee.c gmpmee.h

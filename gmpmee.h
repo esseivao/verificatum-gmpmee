@@ -106,6 +106,7 @@
 #define GMPMEE_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <gmp.h>
 
 /**
@@ -308,7 +309,7 @@ typedef struct
   mpz_t n;             /**< integer to be tested */
   mpz_t n_minus_1;     /**< n minus one */
   mpz_t q;             /**< q is defined by n=q*2^k+1 */
-  unsigned long int k; /**< k is defined by n=q*2^k+1 */
+  uint64_t k;          /**< k is defined by n=q*2^k+1 */
   mpz_t y;             /**< y is temporary space */
 } gmpmee_millerrabin_state[1]; /* Magic references. */
 
@@ -615,6 +616,6 @@ gmpmee_array_clear_dealloc(mpz_t *a, size_t len);
  */
 void
 gmpmee_array_urandomb(mpz_t *rop, size_t len, gmp_randstate_t state,
-		      unsigned long int n);
+          uint64_t n);
 
 #endif /* GMPMEE_H */
