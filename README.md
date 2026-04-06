@@ -83,7 +83,7 @@ it to any location.
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for a structured history of all notable
-changes, including ABI breaks, API changes, bug fixes, and build system
+changes, including ABI breaks, API changes, safety fixes, and build system
 updates.
 
 

@@ -50,15 +50,6 @@ object file ABI and callers must still be recompiled.
 
 ### Fixed
 
-- **[Security/Safety]** Null pointer dereference on allocation failure.
-  `gmpmee_array_alloc` and `gmpmee_spowm_init` previously used `malloc`
-  results without checking for NULL. Under memory pressure, subsequent
-  writes through the null-backed pointer caused undefined behavior (heap
-  corruption or crash). All allocation sites now call `abort()` immediately
-  on NULL, giving a deterministic failure instead of silent corruption.
-  This is consistent with GMP's own allocation strategy.
-  Affected files: `array_alloc.c`, `spowm_init.c`.
-
 - **[Safety]** Shift-width and integer-overflow undefined behavior in table
   sizing and mask arithmetic. Expressions of the form `1 << block_width` and
   `1 << w` used a signed 32-bit `int` literal `1`. Per C11 §6.5.7¶4, this
