@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <limits.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -27,8 +28,9 @@ gmpmee_spowm_precomp(gmpmee_spowm_tab table, mpz_t *bases)
   size_t i, j;
   size_t tabs_len = table->tabs_len;
   size_t block_width = table->block_width;
-  int mask;
-  int one_mask;
+  size_t tab_len;
+  size_t mask;
+  size_t one_mask;
   mpz_t *t;
 
   for (i = 0; i < tabs_len; i++)
@@ -38,6 +40,12 @@ gmpmee_spowm_precomp(gmpmee_spowm_tab table, mpz_t *bases)
         {
           block_width = table->len - (tabs_len - 1) * block_width;
         }
+
+      if (block_width >= sizeof(size_t) * CHAR_BIT)
+        {
+          abort();
+        }
+      tab_len = ((size_t)1) << block_width;
 
       /* Current subtable. */
       t = table->tabs[i];
@@ -53,9 +61,9 @@ gmpmee_spowm_precomp(gmpmee_spowm_tab table, mpz_t *bases)
         }
 
       /* Initialize current subtable with all non-trivial products. */
-      for (mask = 1; mask < (1 << block_width); mask++)
+      for (mask = 1; mask < tab_len; mask++)
         {
-          one_mask = mask & (-mask);
+          one_mask = mask & ((size_t)0 - mask);
           mpz_mul(t[mask], t[mask ^ one_mask], t[one_mask]);
           mpz_mod(t[mask], t[mask], table->modulus);
         }
