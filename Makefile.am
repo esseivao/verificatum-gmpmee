@@ -93,7 +93,7 @@ dist_noinst_DATA = extract_GMP_CFLAGS.c doxygen.cfg trialdiv_32.c trialdiv_64.c 
 
 all-local: check_info.stamp
 
-check_info.stamp: gmpmee
+check_info.stamp: gmpmee$(EXEEXT)
 	@echo ""
 	@echo "================================================================"
 	@echo ""
@@ -121,11 +121,11 @@ install-data-hook:
 	@echo ""
 
 check:
-	@./gmpmee 800
+	@./gmpmee$(EXEEXT) 800
 
 # Uncomment OPTIONAL_FLAGS above to enable instrumentation.
 coverage: all
-	@./gmpmee 1000
+	@./gmpmee$(EXEEXT) 1000
 	@rm -rf coverage
 	@mkdir -p coverage
 	@lcov --capture --directory . --output-file coverage/coverage.info
