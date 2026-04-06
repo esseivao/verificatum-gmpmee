@@ -57,8 +57,7 @@ $(BINDIR)/gmpmee-info: scriptmacros.m4 gmpmee-info.src
 # Actual target.
 lib_LTLIBRARIES = libgmpmee.la
 libgmpmee_la_SOURCES = spowm.c spowm_clear.c spowm_precomp.c spowm_init.c spowm_table.c spowm_block_batch.c spowm_naive.c array_alloc.c array_clear_dealloc.c array_urandomb.c array_alloc_init.c fpowm.c fpowm_clear.c fpowm_init.c fpowm_precomp.c fpowm_init_precomp.c millerrabin_init.c millerrabin_next_cand.c millerrabin_clear.c millerrabin_trial.c millerrabin_once.c millerrabin_reps_rs.c millerrabin_rs.c millerrabin_next_rs.c millerrabin_safe_init.c millerrabin_safe_next_cand.c millerrabin_safe_clear.c millerrabin_safe_trial.c millerrabin_safe_reps_rs.c millerrabin_safe_rs.c millerrabin_safe_next_rs.c probab_prime_p_next.c probab_safe_prime_p.c probab_safe_prime_p_next.c
-libgmpmee_la_LDFLAGS = -no-undefined
-
+libgmpmee_la_LDFLAGS = -no-undefined -version-info 1:0:0
 libgmpmee_la_LIBADD = -lgmp
 gmpmee_LDADD = libgmpmee.la
 
