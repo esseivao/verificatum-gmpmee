@@ -48,6 +48,11 @@ object file ABI and callers must still be recompiled.
   to `uint64_t`. Callers passing values wider than 32 bits on Windows or
   32-bit Linux now work correctly.
 
+- The `gmpmee` test and benchmark executable now uses fixed-width timing and
+  parsing types (`int64_t`, `clock_t`, `strtoll`, `PRId64`) instead of
+  platform-dependent `long` handling. This makes the command-line test duration
+  parsing and status output consistent across Windows and Linux builds.
+
 ### Fixed
 
 - **[Safety]** Shift-width and integer-overflow undefined behavior in table
@@ -79,6 +84,12 @@ object file ABI and callers must still be recompiled.
 - Declared generated trial-division files as `BUILT_SOURCES` and added
   explicit `.lo` dependencies (`millerrabin_trial.lo`,
   `millerrabin_safe_trial.lo`) to guarantee correct parallel-build ordering.
+
+### Documentation
+
+- Introduced this structured `CHANGELOG.md` for release tracking and linked it
+  from `README.md` so downstream consumers can find ABI, API, safety, and build
+  changes from the main project documentation.
 
 ---
 
