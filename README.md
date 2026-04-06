@@ -80,6 +80,13 @@ installed `doxygen`). The API is not installed anywhere. You can copy
 it to any location.
 
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a structured history of all notable
+changes, including ABI breaks, API changes, safety fixes, and build system
+updates.
+
+
 ## Reporting Bugs
 
 Minor bugs should be reported in the repository system as issues or
