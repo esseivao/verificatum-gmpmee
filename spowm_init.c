@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <limits.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -42,7 +43,11 @@ gmpmee_spowm_init(gmpmee_spowm_tab table, size_t len, mpz_t modulus,
   /* Allocate and initialize space for pointers to tables. */
   table->tabs = (mpz_t **)malloc(table->tabs_len * sizeof(mpz_t *));
 
-  tab_len = 1 << block_width;
+  if (block_width >= sizeof(size_t) * CHAR_BIT)
+    {
+      abort();
+    }
+  tab_len = ((size_t)1) << block_width;
   for (i = 0; i < table->tabs_len; i++)
     {
 
@@ -52,7 +57,11 @@ gmpmee_spowm_init(gmpmee_spowm_tab table, size_t len, mpz_t modulus,
 	  && len - (table->tabs_len - 1) * block_width < block_width)
 	{
 	  block_width = len - (table->tabs_len - 1) * block_width;
-	  tab_len = 1 << block_width;
+	  if (block_width >= sizeof(size_t) * CHAR_BIT)
+	    {
+	      abort();
+	    }
+	  tab_len = ((size_t)1) << block_width;
 	}
 
       /* Allocate and initialize a table. */
