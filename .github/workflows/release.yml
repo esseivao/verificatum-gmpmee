@@ -108,6 +108,14 @@ jobs:
           fi
           cp "$dll" upload/libgmpmee-1.dll
 
+          implib="$(find build -maxdepth 3 \( -name 'libgmpmee.dll.a' -o -name 'gmpmee.lib' -o -name 'libgmpmee.lib' \) | sort | head -n 1)"
+          if [ -z "$implib" ]; then
+            echo "No Windows import library found."
+            find build -maxdepth 3 -type f -o -type l
+            exit 1
+          fi
+          cp "$implib" upload/libgmpmee-1.lib
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -142,6 +150,8 @@ jobs:
             **This is a beta version (${{ github.ref_name }}).**
           draft: false
           prerelease: true
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
+            gmpmee.h
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
