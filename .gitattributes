@@ -11,6 +11,7 @@
 *.in text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
+*.json text eol=lf
 *.supp text eol=lf
 CMakeLists.txt text eol=lf
 Makefile.build text eol=lf
