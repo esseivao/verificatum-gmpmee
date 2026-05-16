@@ -156,12 +156,14 @@ jobs:
             --suppress=unusedVariable \
             --suppress=missingInclude \
             --suppress=unmatchedSuppression \
+            --suppress=checkersReport \
             --inline-suppr \
             --quiet \
             --error-exitcode=1 \
             *.c *.h 2> cppcheck.txt || true
 
           echo "=== CPPCHECK SUMMARY ==="
+          sed -i '/\[checkersReport\]/d' cppcheck.txt
           if [ -s cppcheck.txt ]; then
             echo "=== CPPCHECK FOUND ISSUES ==="
             cat cppcheck.txt
