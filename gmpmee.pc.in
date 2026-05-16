@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: GMPMEE
+Description: @PROJECT_DESCRIPTION@
+Version: @PROJECT_VERSION@
+Requires: gmp
+Libs: -L${libdir} -lgmpmee
+Cflags: -I${includedir}

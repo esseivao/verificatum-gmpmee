@@ -1,0 +1,348 @@
+name: CI - GMPMEE
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ====================== Linux + macOS ======================
+  unix:
+    name: ${{ matrix.os }} - ${{ matrix.compiler }} - ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        compiler: [ gcc, clang ]
+        build_type: [ Debug, Release ]
+        include:
+          # Dedicated Clang sanitizer job (only on Linux).
+          - os: ubuntu-latest
+            compiler: clang
+            build_type: Debug
+            sanitizer: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install GMP (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libgmp-dev
+
+      - name: Install GMP (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install gmp
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          compiler="${{ matrix.compiler }}"
+          cmake_args=(
+            -B build
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DBUILD_SHARED_LIBS=ON
+            -DENABLE_SANITIZERS=${{ matrix.sanitizer == true }}
+            -DCMAKE_C_COMPILER="${compiler}"
+          )
+
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            cmake_args+=("-DCMAKE_PREFIX_PATH=$(brew --prefix gmp)")
+          fi
+
+          cmake "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Test
+        working-directory: build
+        env:
+          # Suppress known GMP + legacy test leaks.
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/lsan.supp
+        run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+      - name: Install (test packaging)
+        if: matrix.build_type == 'Release'
+        run: sudo cmake --install build
+
+  # ====================== Code Quality + Coverage ======================
+  quality:
+    name: Code Quality & Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            clang-tidy \
+            cppcheck \
+            git \
+            libgmp-dev \
+            lcov \
+            valgrind
+
+      - name: Configure CMake with Coverage
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_SHARED_LIBS=ON \
+            -DENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build --verbose
+
+      - name: Run Tests with Coverage
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Generate lcov Coverage Report
+        run: |
+          echo "=== Coverage data files ==="
+          find build -name '*.gcno' -o -name '*.gcda'
+          lcov --capture \
+            --directory build \
+            --base-directory . \
+            --output-file build/coverage.raw.info
+          lcov --remove build/coverage.raw.info \
+            '/usr/*' \
+            '*/build/*' \
+            '*trialdiv*.c' \
+            --ignore-errors unused \
+            --output-file build/coverage.info
+          lcov --list build/coverage.info
+          genhtml build/coverage.info --output-directory build/coverage-report --title "GMPMEE Code Coverage"
+
+      - name: Upload Coverage Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage-report
+          retention-days: 30
+
+      - name: Run clang-tidy
+        run: |
+          cmake -B build-tidy \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_CLANG_TIDY=clang-tidy
+          cmake --build build-tidy --verbose 2>&1 | tee clang-tidy.log
+
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --inconclusive --std=c11 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --suppress=variableScope \
+            --suppress=constParameterPointer \
+            --suppress=constParameter \
+            --suppress=unreadVariable \
+            --suppress=knownConditionTrueFalse \
+            --suppress=unsignedLongLongOverflow \
+            --suppress=duplicateCondition \
+            --suppress=constVariablePointer \
+            --suppress=unusedVariable \
+            --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
+            --suppress=checkersReport \
+            --inline-suppr \
+            --quiet \
+            --error-exitcode=1 \
+            *.c *.h 2> cppcheck.txt || true
+
+          echo "=== CPPCHECK SUMMARY ==="
+          sed -i '/\[checkersReport\]/d' cppcheck.txt
+          if [ -s cppcheck.txt ]; then
+            echo "=== CPPCHECK FOUND ISSUES ==="
+            cat cppcheck.txt
+            echo "cppcheck found issues (see log)"
+            exit 1
+          else
+            echo "cppcheck passed cleanly."
+          fi
+
+      - name: Valgrind (Memory Analysis)
+        working-directory: build
+        run: |
+          echo "=== Running Valgrind ==="
+          valgrind \
+            --tool=memcheck \
+            --leak-check=full \
+            --show-leak-kinds=all \
+            --track-origins=yes \
+            --error-exitcode=1 \
+            --verbose \
+            --log-file=valgrind.log \
+            ./gmpmee 200 || true
+
+          echo "=== Valgrind Summary ==="
+          grep -E "(ERROR SUMMARY|LEAK SUMMARY|definitely lost|indirectly lost)" valgrind.log || true
+
+          if grep -q "ERROR SUMMARY: [^0]" valgrind.log; then
+            echo "=== FULL VALGRIND LOG ==="
+            cat valgrind.log
+            exit 1
+          fi
+
+      - name: Upload Quality Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            cppcheck.txt
+            build/valgrind.log
+            clang-tidy.log
+          retention-days: 30
+
+  # ====================== Windows (MSVC) ======================
+  windows:
+    name: Windows - MSVC - ${{ matrix.build_type }}
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ Debug, Release ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install GMP via vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: 2b65c20fc66eda893aa15a15a453c3cf09500b19
+          vcpkgJsonGlob: vcpkg.json
+
+      - name: Configure CMake (MSVC)
+        shell: pwsh
+        run: |
+          cmake -B build `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DBUILD_SHARED_LIBS=ON `
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+  # ====================== Windows (MinGW-w64 GCC) ======================
+  windows-mingw:
+    name: Windows - MinGW-w64 GCC - Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 and GMP
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+
+      - name: Configure CMake (MinGW-w64)
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=gcc
+
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build
+
+      - name: Test
+        shell: msys2 {0}
+        working-directory: build
+        run: ctest --output-on-failure
+
+  # ====================== 32-bit Legacy (ubuntu-22.04) ======================
+  build-32bit-legacy:
+    name: ubuntu-22.04 32-bit - ${{ matrix.compiler }} - Release
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [ gcc, clang ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install 32-bit dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-multilib \
+            g++-multilib \
+            libgmp-dev:i386
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            sudo apt-get install -y clang
+          fi
+
+      - name: Configure 32-bit
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
+            -DCMAKE_C_FLAGS=-m32 \
+            -DCMAKE_EXE_LINKER_FLAGS=-m32 \
+            -DCMAKE_SHARED_LINKER_FLAGS=-m32 \
+            -DGMP_INCLUDE_DIR=/usr/include \
+            -DGMP_LIBRARY=/usr/lib/i386-linux-gnu/libgmp.so
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure
+
+  freebsd:
+    name: FreeBSD 15.0
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.0"
+          envs: "GITHUB_TOKEN"
+          usesh: true
+          prepare: |
+            pkg install -y gmp cmake python3
+          run: |
+            cmake -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_SHARED_LIBS=ON
+            cmake --build build
+            cd build && ctest --output-on-failure
