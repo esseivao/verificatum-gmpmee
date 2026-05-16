@@ -1,0 +1,157 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-latest
+
+          - platform: macos-universal
+            os: macos-latest
+
+          - platform: windows-x64
+            os: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libgmp-dev
+
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install gmp
+
+      - name: Install MinGW + GMP (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
+
+      - name: Build (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
+        shell: bash
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON
+          cmake --build build --config Release
+
+      - name: Build (MinGW)
+        if: startsWith(matrix.os, 'windows')
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=gcc
+          cmake --build build
+
+      - name: Prepare named artifacts (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
+        shell: bash
+        run: |
+          mkdir -p upload
+
+          if [[ "${{ matrix.platform }}" == "linux-x86_64" ]]; then
+            lib="$(find build -maxdepth 3 \( -name 'libgmpmee.so.1' -o -name 'libgmpmee.so.1.*' \) | sort | head -n 1)"
+            if [ -z "$lib" ]; then
+              echo "No Linux shared library matching libgmpmee.so.1* found."
+              find build -maxdepth 3 -type f -o -type l
+              exit 1
+            fi
+            cp -L "$lib" upload/libgmpmee.so.1
+          fi
+
+          if [[ "${{ matrix.platform }}" == "macos-universal" ]]; then
+            lib="$(find build -maxdepth 3 \( -name 'libgmpmee.1.dylib' -o -name 'libgmpmee.*.dylib' \) | sort | head -n 1)"
+            if [ -z "$lib" ]; then
+              echo "No macOS shared library matching libgmpmee.1.dylib found."
+              find build -maxdepth 3 -type f -o -type l
+              exit 1
+            fi
+            cp -L "$lib" upload/libgmpmee.1.dylib
+          fi
+
+      - name: Prepare named artifacts (Windows)
+        if: startsWith(matrix.os, 'windows')
+        shell: msys2 {0}
+        run: |
+          mkdir -p upload
+
+          dll="$(find build -maxdepth 3 \( -name 'libgmpmee.dll' -o -name 'gmpmee.dll' -o -name 'libgmpmee-1.dll' \) | sort | head -n 1)"
+          if [ -z "$dll" ]; then
+            echo "No Windows DLL found."
+            find build -maxdepth 3 -type f -o -type l
+            exit 1
+          fi
+          cp "$dll" upload/libgmpmee-1.dll
+
+          implib="$(find build -maxdepth 3 \( -name 'libgmpmee.dll.a' -o -name 'gmpmee.lib' -o -name 'libgmpmee.lib' \) | sort | head -n 1)"
+          if [ -z "$implib" ]; then
+            echo "No Windows import library found."
+            find build -maxdepth 3 -type f -o -type l
+            exit 1
+          fi
+          cp "$implib" upload/libgmpmee-1.lib
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gmpmee-${{ matrix.platform }}
+          path: upload/
+          if-no-files-found: warn
+
+  publish:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: GMPMEE ${{ github.ref_name }}
+          body: |
+            # GMPMEE ${{ github.ref_name }}
+
+            Pre-release build for testing.
+
+            **This is a beta version (${{ github.ref_name }}).**
+          draft: false
+          prerelease: true
+          files: |
+            artifacts/**/*
+            gmpmee.h
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

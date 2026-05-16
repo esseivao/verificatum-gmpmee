@@ -11,7 +11,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [3.0.0] - 2026-04-06
+## [3.0.0]-b0 - 2026-05-16
 
 ### ⚠ ABI BREAK — action required for downstream consumers
 
@@ -37,6 +37,19 @@ and the function calling convention.
 On 64-bit Linux, `unsigned long int` and `uint64_t` are both 64 bits, so
 there is no layout change. However, the signature change is visible in the
 object file ABI and callers must still be recompiled.
+
+### Added
+
+- Modern CMake build system (primary build method)
+- Comprehensive GitHub Actions CI matrix (Linux, macOS, Windows MSVC, MinGW-w64, 32-bit legacy)
+- Sanitizers (ASan + UBSan) in Debug builds
+- Code quality checks: clang-tidy, cppcheck, Valgrind
+- Code coverage analysis with lcov + HTML report
+- GitHub Pages deployment for coverage reports
+- Proper Windows DLL deployment for shared builds
+- MinGW-w64 GCC support on Windows
+- FreeBSD testing via VM
+- Full install rules and pkg-config support
 
 ### Changed
 

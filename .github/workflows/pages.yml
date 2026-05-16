@@ -10,7 +10,7 @@ on:
       run_id:
         description: "Workflow run id containing the coverage-report artifact"
         required: true
-        type: string
+        type: string  
 
 permissions:
   contents: read
