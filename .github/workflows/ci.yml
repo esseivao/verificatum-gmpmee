@@ -72,6 +72,67 @@ jobs:
         if: matrix.build_type == 'Release'
         run: sudo cmake --install build
 
+  # ====================== Code Quality ======================
+  quality:
+    name: Code Quality - ${{ matrix.tool }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: [ clang-tidy, cppcheck ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            clang-tidy \
+            cppcheck \
+            libgmp-dev \
+            lcov \
+            valgrind
+
+      - name: Configure CMake
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DENABLE_SANITIZERS=${{ matrix.tool == 'clang-tidy' }}
+
+      - name: Run clang-tidy
+        if: matrix.tool == 'clang-tidy'
+        run: |
+          cmake -B build-tidy \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_CLANG_TIDY=clang-tidy
+          cmake --build build-tidy --verbose 2>&1 | tee clang-tidy.log
+
+      - name: Run cppcheck
+        if: matrix.tool == 'cppcheck'
+        run: |
+          cppcheck --enable=all --inconclusive --std=c11 \
+            --suppress=missingIncludeSystem \
+            --suppress=unusedFunction \
+            --error-exitcode=1 \
+            --xml-version=2 \
+            *.c *.h 2> cppcheck.xml
+
+      - name: Build for Valgrind
+        if: matrix.tool == 'cppcheck'
+        run: cmake --build build --verbose
+
+      - name: Valgrind
+        if: matrix.tool == 'cppcheck'
+        run: |
+          valgrind --leak-check=full --error-exitcode=1 ./build/gmpmee 200
+
   # ====================== Windows (MSVC) ======================
   windows:
     name: Windows - MSVC - ${{ matrix.build_type }}
