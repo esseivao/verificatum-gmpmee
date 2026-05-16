@@ -117,12 +117,30 @@ jobs:
       - name: Run cppcheck
         if: matrix.tool == 'cppcheck'
         run: |
+          set +e
           cppcheck --enable=all --inconclusive --std=c11 \
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
             --error-exitcode=1 \
             --xml-version=2 \
             *.c *.h 2> cppcheck.xml
+          status=$?
+          echo "${status}" > cppcheck.exitcode
+
+          if [ "${status}" -ne 0 ]; then
+            echo "=== CPPCHECK XML REPORT ==="
+            cat cppcheck.xml
+          fi
+
+          exit 0
+
+      - name: Upload cppcheck Report
+        if: always() && matrix.tool == 'cppcheck'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cppcheck-report
+          path: cppcheck.xml
+          retention-days: 30
 
       - name: Build for Valgrind
         if: matrix.tool == 'cppcheck'
@@ -133,6 +151,7 @@ jobs:
         working-directory: build
         run: |
           echo "=== Running Valgrind ==="
+          set +e
           valgrind \
             --tool=memcheck \
             --leak-check=full \
@@ -142,6 +161,8 @@ jobs:
             --verbose \
             --log-file=valgrind.log \
             ./gmpmee 200
+          status=$?
+          echo "${status}" > ../valgrind.exitcode
 
           echo "=== Valgrind Summary ==="
           grep -E "(ERROR SUMMARY|LEAK SUMMARY|definitely lost|indirectly lost|Invalid read|Invalid write)" valgrind.log || true
@@ -150,16 +171,38 @@ jobs:
           if grep -q "ERROR SUMMARY: [^0]" valgrind.log; then
             echo "=== FULL VALGRIND LOG ==="
             cat valgrind.log
-            exit 1
           fi
 
+          exit 0
+
       - name: Upload Valgrind Report
-        if: always() && matrix.tool == 'cppcheck'
+        if: always() && matrix.tool == 'cppcheck' && hashFiles('build/valgrind.log') != ''
         uses: actions/upload-artifact@v4
         with:
           name: valgrind-report
           path: build/valgrind.log
           retention-days: 30
+
+      - name: Fail on quality errors
+        if: always() && matrix.tool == 'cppcheck'
+        run: |
+          cppcheck_status=0
+          valgrind_status=0
+
+          if [ -f cppcheck.exitcode ]; then
+            cppcheck_status=$(cat cppcheck.exitcode)
+          fi
+
+          if [ -f valgrind.exitcode ]; then
+            valgrind_status=$(cat valgrind.exitcode)
+          fi
+
+          echo "cppcheck exit code: ${cppcheck_status}"
+          echo "valgrind exit code: ${valgrind_status}"
+
+          if [ "${cppcheck_status}" -ne 0 ] || [ "${valgrind_status}" -ne 0 ]; then
+            exit 1
+          fi
 
   # ====================== Windows (MSVC) ======================
   windows:
