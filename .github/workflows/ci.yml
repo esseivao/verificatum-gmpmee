@@ -72,14 +72,10 @@ jobs:
         if: matrix.build_type == 'Release'
         run: sudo cmake --install build
 
-  # ====================== Code Quality ======================
+  # ====================== Code Quality + Coverage ======================
   quality:
-    name: Code Quality - ${{ matrix.tool }}
+    name: Code Quality & Coverage
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        tool: [ clang-tidy, cppcheck ]
 
     steps:
       - name: Checkout code
@@ -92,20 +88,41 @@ jobs:
             clang \
             clang-tidy \
             cppcheck \
+            git \
             libgmp-dev \
             lcov \
             valgrind
 
-      - name: Configure CMake
+      - name: Configure CMake with Coverage
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_C_COMPILER=clang \
-            -DENABLE_SANITIZERS=${{ matrix.tool == 'clang-tidy' }}
+            -DENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build --verbose
+
+      - name: Run Tests with Coverage
+        working-directory: build
+        run: ctest --output-on-failure
+
+      - name: Generate lcov Coverage Report
+        working-directory: build
+        run: |
+          lcov --capture --directory . --output-file coverage.info --no-external
+          lcov --remove coverage.info '/usr/*' '*/build/*' --output-file coverage.info
+          lcov --list coverage.info
+          genhtml coverage.info --output-directory coverage-report --title "GMPMEE Code Coverage"
+
+      - name: Upload Coverage Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage-report
+          retention-days: 30
 
       - name: Run clang-tidy
-        if: matrix.tool == 'clang-tidy'
         run: |
           cmake -B build-tidy \
             -DCMAKE_BUILD_TYPE=Debug \
@@ -115,9 +132,7 @@ jobs:
           cmake --build build-tidy --verbose 2>&1 | tee clang-tidy.log
 
       - name: Run cppcheck
-        if: matrix.tool == 'cppcheck'
         run: |
-          set +e
           cppcheck --enable=all --inconclusive --std=c11 \
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
@@ -131,40 +146,26 @@ jobs:
             --suppress=constVariablePointer \
             --suppress=unusedVariable \
             --suppress=missingInclude \
+            --suppress=unmatchedSuppression \
             --inline-suppr \
             --quiet \
             --error-exitcode=1 \
-            *.c *.h 2> cppcheck.txt
-          status=$?
-          echo "${status}" > cppcheck.exitcode
+            *.c *.h 2> cppcheck.txt || true
 
+          echo "=== CPPCHECK SUMMARY ==="
           if [ -s cppcheck.txt ]; then
             echo "=== CPPCHECK FOUND ISSUES ==="
             cat cppcheck.txt
+            echo "cppcheck found issues (see log)"
+            exit 1
           else
-            echo "cppcheck passed (with current suppressions)"
+            echo "cppcheck passed cleanly."
           fi
 
-          exit 0
-
-      - name: Upload cppcheck Report
-        if: always() && matrix.tool == 'cppcheck'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cppcheck-report
-          path: cppcheck.txt
-          retention-days: 30
-
-      - name: Build for Valgrind
-        if: matrix.tool == 'cppcheck'
-        run: cmake --build build --verbose
-
       - name: Valgrind (Memory Analysis)
-        if: matrix.tool == 'cppcheck'
         working-directory: build
         run: |
           echo "=== Running Valgrind ==="
-          set +e
           valgrind \
             --tool=memcheck \
             --leak-check=full \
@@ -173,49 +174,27 @@ jobs:
             --error-exitcode=1 \
             --verbose \
             --log-file=valgrind.log \
-            ./gmpmee 200
-          status=$?
-          echo "${status}" > ../valgrind.exitcode
+            ./gmpmee 200 || true
 
           echo "=== Valgrind Summary ==="
-          grep -E "(ERROR SUMMARY|LEAK SUMMARY|definitely lost|indirectly lost|Invalid read|Invalid write)" valgrind.log || true
+          grep -E "(ERROR SUMMARY|LEAK SUMMARY|definitely lost|indirectly lost)" valgrind.log || true
 
-          # Show full log if there are errors.
           if grep -q "ERROR SUMMARY: [^0]" valgrind.log; then
             echo "=== FULL VALGRIND LOG ==="
             cat valgrind.log
-          fi
-
-          exit 0
-
-      - name: Upload Valgrind Report
-        if: always() && matrix.tool == 'cppcheck' && hashFiles('build/valgrind.log') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: valgrind-report
-          path: build/valgrind.log
-          retention-days: 30
-
-      - name: Fail on quality errors
-        if: always() && matrix.tool == 'cppcheck'
-        run: |
-          cppcheck_status=0
-          valgrind_status=0
-
-          if [ -f cppcheck.exitcode ]; then
-            cppcheck_status=$(cat cppcheck.exitcode)
-          fi
-
-          if [ -f valgrind.exitcode ]; then
-            valgrind_status=$(cat valgrind.exitcode)
-          fi
-
-          echo "cppcheck exit code: ${cppcheck_status}"
-          echo "valgrind exit code: ${valgrind_status}"
-
-          if [ "${cppcheck_status}" -ne 0 ] || [ "${valgrind_status}" -ne 0 ]; then
             exit 1
           fi
+
+      - name: Upload Quality Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            cppcheck.txt
+            build/valgrind.log
+            clang-tidy.log
+          retention-days: 30
 
   # ====================== Windows (MSVC) ======================
   windows:
