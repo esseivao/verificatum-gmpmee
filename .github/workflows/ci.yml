@@ -110,6 +110,8 @@ jobs:
       - name: Generate lcov Coverage Report
         working-directory: build
         run: |
+          echo "=== Coverage data files ==="
+          find . -name '*.gcno' -o -name '*.gcda'
           lcov --capture --directory . --output-file coverage.info --no-external
           lcov --remove coverage.info '/usr/*' '*/build/*' --output-file coverage.info
           lcov --list coverage.info
