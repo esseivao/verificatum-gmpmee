@@ -1,0 +1,196 @@
+name: CI - GMPMEE
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ====================== Linux + macOS ======================
+  unix:
+    name: ${{ matrix.os }} - ${{ matrix.compiler }} - ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+        compiler: [ gcc, clang ]
+        build_type: [ Debug, Release ]
+        include:
+          # Dedicated Clang sanitizer job (only on Linux).
+          - os: ubuntu-latest
+            compiler: clang
+            build_type: Debug
+            sanitizer: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install GMP (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: sudo apt-get update && sudo apt-get install -y libgmp-dev
+
+      - name: Install GMP (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install gmp
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          compiler="${{ matrix.compiler }}"
+          cmake_args=(
+            -B build
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DBUILD_SHARED_LIBS=ON
+            -DENABLE_SANITIZERS=${{ matrix.sanitizer == true }}
+            -DCMAKE_C_COMPILER="${compiler}"
+          )
+
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            cmake_args+=("-DCMAKE_PREFIX_PATH=$(brew --prefix gmp)")
+          fi
+
+          cmake "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+
+      - name: Test
+        working-directory: build
+        env:
+          # Suppress known GMP + legacy test leaks.
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/lsan.supp
+        run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+      - name: Install (test packaging)
+        if: matrix.build_type == 'Release'
+        run: sudo cmake --install build
+
+  # ====================== Windows (MinGW-w64 GCC) ======================
+  windows-mingw:
+    name: Windows - MinGW-w64 GCC - Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 and GMP
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+
+      - name: Inspect MinGW environment
+        shell: msys2 {0}
+        run: |
+          uname -a
+          which cmake
+          cmake --version
+          which gcc
+          gcc --version
+          echo "PATH=$PATH"
+          pacman -Q | grep -E 'mingw-w64-x86_64-(gcc|gmp|cmake|ninja|python)' || true
+
+      - name: Configure CMake (MinGW-w64)
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_VERBOSE_MAKEFILE=ON
+
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build --verbose
+
+      - name: Inspect MinGW build outputs
+        shell: msys2 {0}
+        run: |
+          find build -type f \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print
+          find build -name 'gmpmee.exe' -print -exec ldd {} \; || true
+
+      - name: Test
+        shell: msys2 {0}
+        working-directory: build
+        run: ctest --output-on-failure --verbose
+
+  # ====================== 32-bit Legacy (ubuntu-22.04) ======================
+  build-32bit-legacy:
+    name: ubuntu-22.04 32-bit - ${{ matrix.compiler }} - Release
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [ gcc, clang ]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install 32-bit dependencies
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-multilib \
+            g++-multilib \
+            libgmp-dev:i386
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            sudo apt-get install -y clang
+          fi
+
+      - name: Configure 32-bit
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
+            -DCMAKE_C_FLAGS=-m32 \
+            -DCMAKE_EXE_LINKER_FLAGS=-m32 \
+            -DCMAKE_SHARED_LINKER_FLAGS=-m32 \
+            -DGMP_INCLUDE_DIR=/usr/include \
+            -DGMP_LIBRARY=/usr/lib/i386-linux-gnu/libgmp.so
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure
+
+  freebsd:
+    name: FreeBSD 15.0
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run on FreeBSD
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "15.0"
+          envs: "GITHUB_TOKEN"
+          usesh: true
+          prepare: |
+            pkg install -y gmp cmake python3
+          run: |
+            cmake -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_SHARED_LIBS=ON
+            cmake --build build
+            cd build && ctest --output-on-failure
