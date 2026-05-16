@@ -39,6 +39,7 @@ there is no layout change. However, the signature change is visible in the
 object file ABI and callers must still be recompiled.
 
 ### Added
+
 - Modern CMake build system (primary build method)
 - Comprehensive GitHub Actions CI matrix (Linux, macOS, Windows MSVC, MinGW-w64, 32-bit legacy)
 - Sanitizers (ASan + UBSan) in Debug builds

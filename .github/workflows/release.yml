@@ -10,101 +10,148 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.os }}
+    name: Build ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
       matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-latest
+
+          - platform: macos-universal
+            os: macos-latest
+
+          - platform: windows-x64
+            os: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install GMP (Linux)
+      - name: Install dependencies (Linux)
         if: startsWith(matrix.os, 'ubuntu')
         run: sudo apt-get update && sudo apt-get install -y libgmp-dev
 
-      - name: Install GMP (macOS)
+      - name: Install dependencies (macOS)
         if: startsWith(matrix.os, 'macos')
         run: brew install gmp
 
-      - name: Install GMP (Windows)
+      - name: Install MinGW + GMP (Windows)
         if: startsWith(matrix.os, 'windows')
-        uses: lukka/run-vcpkg@v11
+        uses: msys2/setup-msys2@v2
         with:
-          vcpkgGitCommitId: 2b65c20fc66eda893aa15a15a453c3cf09500b19
-          vcpkgJsonGlob: vcpkg.json
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
 
-      - name: Configure Release (Windows)
-        if: startsWith(matrix.os, 'windows')
-        shell: pwsh
-        run: |
-          cmake -B build `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DBUILD_SHARED_LIBS=ON `
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
-
-      - name: Configure Release (Unix)
+      - name: Build (Unix)
         if: "!startsWith(matrix.os, 'windows')"
         shell: bash
         run: |
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON
+          cmake --build build --config Release
 
-      - name: Build Release
-        run: cmake --build build --config Release
+      - name: Build (MinGW)
+        if: startsWith(matrix.os, 'windows')
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=gcc
+          cmake --build build
 
-      - name: Upload binaries
+      - name: Prepare named artifacts (Unix)
+        if: "!startsWith(matrix.os, 'windows')"
+        shell: bash
+        run: |
+          mkdir -p upload
+
+          if [[ "${{ matrix.platform }}" == "linux-x86_64" ]]; then
+            if [ -f build/libgmpmee.so.1 ]; then
+              cp build/libgmpmee.so.1 upload/libgmpmee.so.1
+            else
+              lib="$(find build -maxdepth 1 -name 'libgmpmee.so*' -type f | head -n 1)"
+              if [ -n "$lib" ]; then
+                cp "$lib" upload/libgmpmee.so.1
+              fi
+            fi
+          fi
+
+          if [[ "${{ matrix.platform }}" == "macos-universal" ]]; then
+            if [ -f build/libgmpmee.1.dylib ]; then
+              cp build/libgmpmee.1.dylib upload/libgmpmee.1.dylib
+            else
+              lib="$(find build -maxdepth 1 -name 'libgmpmee*.dylib' -type f | head -n 1)"
+              if [ -n "$lib" ]; then
+                cp "$lib" upload/libgmpmee.1.dylib
+              fi
+            fi
+          fi
+
+          cp gmpmee.h upload/
+
+      - name: Prepare named artifacts (Windows)
+        if: startsWith(matrix.os, 'windows')
+        shell: msys2 {0}
+        run: |
+          mkdir -p upload
+
+          if [ -f build/gmpmee.dll ]; then
+            cp build/gmpmee.dll upload/libgmpmee-1.dll
+          elif [ -f build/Release/gmpmee.dll ]; then
+            cp build/Release/gmpmee.dll upload/libgmpmee-1.dll
+          fi
+
+          if [ -f build/libgmpmee.dll.a ]; then
+            cp build/libgmpmee.dll.a upload/libgmpmee-1.lib
+          elif [ -f build/Release/gmpmee.lib ]; then
+            cp build/Release/gmpmee.lib upload/libgmpmee-1.lib
+          fi
+
+          cp gmpmee.h upload/
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: gmpmee-binaries-${{ matrix.os }}
-          path: |
-            build/Release/*.dll
-            build/Release/*.lib
-            build/*.so*
-            build/*.dylib
-            build/*.a
-            gmpmee.h
+          name: gmpmee-${{ matrix.platform }}
+          path: upload/
           if-no-files-found: warn
 
   publish:
-    name: Publish Pre-release
+    name: Publish Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Download all binaries
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create Pre-release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: GMPMEE ${{ github.ref_name }} (Beta)
+          name: GMPMEE ${{ github.ref_name }}
           body: |
-            ## Pre-release ${{ github.ref_name }}
+            # GMPMEE ${{ github.ref_name }}
 
-            First beta of the modernized GMPMEE library.
+            Pre-release build for testing.
 
-            ### Changes
-            - Modern CMake build system
-            - Multi-platform CI (Linux, macOS, Windows)
-            - Code quality tools integrated
-            - Windows MSVC + MinGW support
-
-            **This is a beta release for testing.**
+            **This is a beta version (3.0.0-b0).**
           draft: false
           prerelease: true
-          files: |
-            artifacts/**/*
-          token: ${{ secrets.GITHUB_TOKEN }}
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
