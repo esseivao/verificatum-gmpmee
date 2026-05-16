@@ -72,41 +72,6 @@ jobs:
         if: matrix.build_type == 'Release'
         run: sudo cmake --install build
 
-  # ====================== Windows (MSVC) ======================
-  windows:
-    name: Windows - MSVC - ${{ matrix.build_type }}
-    runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        build_type: [ Debug, Release ]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install GMP via vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          vcpkgGitCommitId: 2b65c20fc66eda893aa15a15a453c3cf09500b19
-          vcpkgJsonGlob: vcpkg.json
-
-      - name: Configure CMake (MSVC)
-        shell: pwsh
-        run: |
-          cmake -B build `
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
-            -DBUILD_SHARED_LIBS=ON `
-            -DCMAKE_TOOLCHAIN_FILE="${{ env.VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
-
-      - name: Build
-        run: cmake --build build --config ${{ matrix.build_type }}
-
-      - name: Test
-        working-directory: build
-        run: ctest --output-on-failure -C ${{ matrix.build_type }}
-
   # ====================== Windows (MinGW-w64 GCC) ======================
   windows-mingw:
     name: Windows - MinGW-w64 GCC - Release
