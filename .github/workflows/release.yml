@@ -75,28 +75,24 @@ jobs:
           mkdir -p upload
 
           if [[ "${{ matrix.platform }}" == "linux-x86_64" ]]; then
-            if [ -f build/libgmpmee.so.1 ]; then
-              cp build/libgmpmee.so.1 upload/libgmpmee.so.1
-            else
-              lib="$(find build -maxdepth 1 -name 'libgmpmee.so*' -type f | head -n 1)"
-              if [ -n "$lib" ]; then
-                cp "$lib" upload/libgmpmee.so.1
-              fi
+            lib="$(find build -maxdepth 3 \( -name 'libgmpmee.so.1' -o -name 'libgmpmee.so.1.*' \) | sort | head -n 1)"
+            if [ -z "$lib" ]; then
+              echo "No Linux shared library matching libgmpmee.so.1* found."
+              find build -maxdepth 3 -type f -o -type l
+              exit 1
             fi
+            cp -L "$lib" upload/libgmpmee.so.1
           fi
 
           if [[ "${{ matrix.platform }}" == "macos-universal" ]]; then
-            if [ -f build/libgmpmee.1.dylib ]; then
-              cp build/libgmpmee.1.dylib upload/libgmpmee.1.dylib
-            else
-              lib="$(find build -maxdepth 1 -name 'libgmpmee*.dylib' -type f | head -n 1)"
-              if [ -n "$lib" ]; then
-                cp "$lib" upload/libgmpmee.1.dylib
-              fi
+            lib="$(find build -maxdepth 3 \( -name 'libgmpmee.1.dylib' -o -name 'libgmpmee.*.dylib' \) | sort | head -n 1)"
+            if [ -z "$lib" ]; then
+              echo "No macOS shared library matching libgmpmee.1.dylib found."
+              find build -maxdepth 3 -type f -o -type l
+              exit 1
             fi
+            cp -L "$lib" upload/libgmpmee.1.dylib
           fi
-
-          cp gmpmee.h upload/
 
       - name: Prepare named artifacts (Windows)
         if: startsWith(matrix.os, 'windows')
@@ -104,19 +100,21 @@ jobs:
         run: |
           mkdir -p upload
 
-          if [ -f build/gmpmee.dll ]; then
-            cp build/gmpmee.dll upload/libgmpmee-1.dll
-          elif [ -f build/Release/gmpmee.dll ]; then
-            cp build/Release/gmpmee.dll upload/libgmpmee-1.dll
+          dll="$(find build -maxdepth 3 \( -name 'libgmpmee.dll' -o -name 'gmpmee.dll' -o -name 'libgmpmee-1.dll' \) | sort | head -n 1)"
+          if [ -z "$dll" ]; then
+            echo "No Windows DLL found."
+            find build -maxdepth 3 -type f -o -type l
+            exit 1
           fi
+          cp "$dll" upload/libgmpmee-1.dll
 
-          if [ -f build/libgmpmee.dll.a ]; then
-            cp build/libgmpmee.dll.a upload/libgmpmee-1.lib
-          elif [ -f build/Release/gmpmee.lib ]; then
-            cp build/Release/gmpmee.lib upload/libgmpmee-1.lib
+          implib="$(find build -maxdepth 3 \( -name 'libgmpmee.dll.a' -o -name 'gmpmee.lib' -o -name 'libgmpmee.lib' \) | sort | head -n 1)"
+          if [ -z "$implib" ]; then
+            echo "No Windows import library found."
+            find build -maxdepth 3 -type f -o -type l
+            exit 1
           fi
-
-          cp gmpmee.h upload/
+          cp "$implib" upload/libgmpmee-1.lib
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -149,9 +147,11 @@ jobs:
 
             Pre-release build for testing.
 
-            **This is a beta version (3.0.0-b0).**
+            **This is a beta version (${{ github.ref_name }}).**
           draft: false
           prerelease: true
-          files: artifacts/**/*
+          files: |
+            artifacts/**/*
+            gmpmee.h
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
