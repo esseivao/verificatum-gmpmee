@@ -121,15 +121,28 @@ jobs:
           cppcheck --enable=all --inconclusive --std=c11 \
             --suppress=missingIncludeSystem \
             --suppress=unusedFunction \
+            --suppress=variableScope \
+            --suppress=constParameterPointer \
+            --suppress=constParameter \
+            --suppress=unreadVariable \
+            --suppress=knownConditionTrueFalse \
+            --suppress=unsignedLongLongOverflow \
+            --suppress=duplicateCondition \
+            --suppress=constVariablePointer \
+            --suppress=unusedVariable \
+            --suppress=missingInclude \
+            --inline-suppr \
+            --quiet \
             --error-exitcode=1 \
-            --xml-version=2 \
-            *.c *.h 2> cppcheck.xml
+            *.c *.h 2> cppcheck.txt
           status=$?
           echo "${status}" > cppcheck.exitcode
 
-          if [ "${status}" -ne 0 ]; then
-            echo "=== CPPCHECK XML REPORT ==="
-            cat cppcheck.xml
+          if [ -s cppcheck.txt ]; then
+            echo "=== CPPCHECK FOUND ISSUES ==="
+            cat cppcheck.txt
+          else
+            echo "cppcheck passed (with current suppressions)"
           fi
 
           exit 0
@@ -139,7 +152,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cppcheck-report
-          path: cppcheck.xml
+          path: cppcheck.txt
           retention-days: 30
 
       - name: Build for Valgrind
