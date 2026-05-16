@@ -128,10 +128,38 @@ jobs:
         if: matrix.tool == 'cppcheck'
         run: cmake --build build --verbose
 
-      - name: Valgrind
+      - name: Valgrind (Memory Analysis)
         if: matrix.tool == 'cppcheck'
+        working-directory: build
         run: |
-          valgrind --leak-check=full --error-exitcode=1 ./build/gmpmee 200
+          echo "=== Running Valgrind ==="
+          valgrind \
+            --tool=memcheck \
+            --leak-check=full \
+            --show-leak-kinds=all \
+            --track-origins=yes \
+            --error-exitcode=1 \
+            --verbose \
+            --log-file=valgrind.log \
+            ./gmpmee 200
+
+          echo "=== Valgrind Summary ==="
+          grep -E "(ERROR SUMMARY|LEAK SUMMARY|definitely lost|indirectly lost|Invalid read|Invalid write)" valgrind.log || true
+
+          # Show full log if there are errors.
+          if grep -q "ERROR SUMMARY: [^0]" valgrind.log; then
+            echo "=== FULL VALGRIND LOG ==="
+            cat valgrind.log
+            exit 1
+          fi
+
+      - name: Upload Valgrind Report
+        if: always() && matrix.tool == 'cppcheck'
+        uses: actions/upload-artifact@v4
+        with:
+          name: valgrind-report
+          path: build/valgrind.log
+          retention-days: 30
 
   # ====================== Windows (MSVC) ======================
   windows:
