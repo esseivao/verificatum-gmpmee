@@ -244,8 +244,12 @@ jobs:
 
   # ====================== Windows (MinGW-w64 GCC) ======================
   windows-mingw:
-    name: Windows - MinGW-w64 GCC - Release
+    name: Windows - MinGW-w64 GCC - ${{ matrix.build_type }}
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type: [ Debug, Release ]
 
     steps:
       - name: Checkout code
@@ -268,7 +272,7 @@ jobs:
         shell: msys2 {0}
         run: |
           cmake -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_SHARED_LIBS=ON \
             -DCMAKE_C_COMPILER=gcc
 
