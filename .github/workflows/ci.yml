@@ -119,6 +119,7 @@ jobs:
             '/usr/*' \
             '*/build/*' \
             '*trialdiv*.c' \
+            --ignore-errors unused \
             --output-file build/coverage.info
           lcov --list build/coverage.info
           genhtml build/coverage.info --output-directory build/coverage-report --title "GMPMEE Code Coverage"
