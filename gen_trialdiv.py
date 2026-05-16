@@ -50,9 +50,9 @@ def check(varname, plist):
 
     splist = []
     for prime in plist:
-        splist.append("%d" % prime)
+        splist.append("((mp_limb_t)%d)" % prime)
 
-    prodString = "*".join(splist) + "U"
+    prodString = "*".join(splist)
 
     remString = "r = mpz_tdiv_ui(%s, %s);" % (varname, prodString)
     

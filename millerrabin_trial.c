@@ -17,6 +17,7 @@
  * along with GMPMEE. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <limits.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -34,10 +35,12 @@ gmpmee_millerrabin_trial(mpz_t n)
   else
     {
 
-#if __SIZEOF_INT__ == 4
+#if ULONG_MAX == 0xffffffffUL
 #include "trialdiv_32.c"
-#elif __SIZEOF_INT__ == 8
+#elif ULONG_MAX == 0xffffffffffffffffUL
 #include "trialdiv_64.c"
+#else
+#error "Unsupported unsigned long width for trial division tables"
 #endif
 
     }

@@ -17,6 +17,8 @@
  * along with GMPMEE. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <limits.h>
+#include <stdlib.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -24,6 +26,12 @@ void
 gmpmee_fpowm_init(gmpmee_fpowm_tab table, mpz_t modulus,
 		  size_t block_width, size_t exponent_bitlen)
 {
+  if (block_width == 0
+      || block_width >= (size_t) (sizeof(int) * CHAR_BIT - 1))
+    {
+      abort();
+    }
+
   gmpmee_spowm_init(table->spowm_table, block_width, modulus, block_width);
   table->stretch = (exponent_bitlen + block_width - 1) / block_width;
 }

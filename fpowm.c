@@ -32,20 +32,20 @@
  * @param block_width Number of integers considered in parallel.
  * @param stretch Number of bits in each integer.
  */
-static int
+static unsigned int
 getbits(mpz_t op, int index, size_t block_width, size_t stretch)
 {
-  int i;
-  int bits = 0;
+  size_t i;
+  unsigned int bits = 0;
 
   if (((size_t) index) < stretch)
     {
-      for (i = block_width - 1; i >= 0; i--)
+      for (i = block_width; i > 0; i--)
 	{
 	  bits <<= 1;
-	  if (mpz_tstbit(op, i * stretch + index))
+	  if (mpz_tstbit(op, (i - 1) * stretch + index))
 	    {
-	      bits |= 1;
+	      bits |= 1u;
 	    }
 	}
       return bits;
@@ -54,8 +54,11 @@ getbits(mpz_t op, int index, size_t block_width, size_t stretch)
   else
     {
       if (mpz_tstbit(op, (block_width - 1) * stretch + index)) {
-	bits |= 1;
-	bits <<= (block_width - 1);
+	bits = 1u;
+	for (i = 1; i < block_width; i++)
+	  {
+	    bits <<= 1;
+	  }
       }
       return bits;
 
@@ -66,7 +69,7 @@ void
 gmpmee_fpowm(mpz_t rop, gmpmee_fpowm_tab table, mpz_t exponent)
 {
   int index;
-  int mask;
+  unsigned int mask;
   size_t max_exponent_bitlen;
   size_t block_width = table->spowm_table->block_width;
   mpz_t **tabs = table->spowm_table->tabs;

@@ -25,18 +25,18 @@
  * in the array. The least significant bit in the output is the bit
  * extracted from the first integer in the input array.
  */
-static int
+static unsigned int
 getbits(mpz_t *op, int index, size_t block_width)
 {
-  int i;
-  int bits = 0;
+  size_t i;
+  unsigned int bits = 0;
 
-  for (i = block_width - 1; i >= 0; i--)
+  for (i = block_width; i > 0; i--)
     {
       bits <<= 1;
-      if (mpz_tstbit(op[i], index))
+      if (mpz_tstbit(op[i - 1], index))
 	{
-	  bits |= 1;
+	  bits |= 1u;
 	}
     }
   return bits;
@@ -47,7 +47,7 @@ gmpmee_spowm_table(mpz_t rop, gmpmee_spowm_tab table, mpz_t *exponents)
 {
   size_t i;
   int index;
-  int mask;
+  unsigned int mask;
   size_t bitlen;
   mpz_t *exps;
   size_t max_exponent_bitlen;

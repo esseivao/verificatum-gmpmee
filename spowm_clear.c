@@ -18,6 +18,7 @@
  */
 
 #include <stdlib.h>
+#include <limits.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -28,7 +29,13 @@ gmpmee_spowm_clear(gmpmee_spowm_tab table)
   mpz_t *t;
   size_t tabs_len = table->tabs_len;
   size_t block_width = table->block_width;
-  size_t tab_len = 1 << block_width;
+  size_t tab_len;
+
+  if (block_width >= sizeof(size_t) * CHAR_BIT)
+    {
+      abort();
+    }
+  tab_len = ((size_t)1) << block_width;
 
   for (i = 0; i < tabs_len; i++)
     {
@@ -37,7 +44,11 @@ gmpmee_spowm_clear(gmpmee_spowm_tab table)
       if (i == tabs_len - 1)
 	{
 	  block_width = table->len - (tabs_len - 1) * block_width;
-	  tab_len = 1 << block_width;
+	  if (block_width >= sizeof(size_t) * CHAR_BIT)
+	    {
+	      abort();
+	    }
+	  tab_len = ((size_t)1) << block_width;
 	}
 
       /* Deallocate all integers in table. */

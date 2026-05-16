@@ -17,6 +17,7 @@
  * along with GMPMEE. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <stdlib.h>
 #include <gmp.h>
 #include "gmpmee.h"
 
@@ -27,6 +28,23 @@ gmpmee_spowm_block_batch(mpz_t rop, mpz_t *bases, mpz_t *exponents, size_t len,
   size_t i;
   gmpmee_spowm_tab table;
   mpz_t tmp;
+
+  if (len == 0)
+    {
+      mpz_set_ui(rop, 1);
+      return;
+    }
+
+  if (batch_len == 0)
+    {
+      abort();
+    }
+
+  if (len < batch_len)
+    {
+      batch_len = len;
+    }
+
   mpz_init(tmp);
 
   gmpmee_spowm_init(table, batch_len, modulus, block_width);
