@@ -2,12 +2,15 @@ name: Deploy Coverage to GitHub Pages
 
 on:
   workflow_run:
-    workflows: ["CI - GMPMEE"]
+    workflows: [ "CI - GMPMEE" ]
     types:
       - completed
   workflow_dispatch:
-  push:
-    branches: [ master ]
+    inputs:
+      run_id:
+        description: "Workflow run id containing the coverage-report artifact"
+        required: true
+        type: string
 
 permissions:
   contents: read
