@@ -1,0 +1,82 @@
+name: CI - GMPMEE
+
+on:
+  push:
+    branches: [ master, develop ]
+  pull_request:
+    branches: [ master, develop ]
+  release:
+    types: [ created ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.os }} ${{ matrix.compiler }} ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-22.04, ubuntu-latest, macos-13, macos-latest ]
+        compiler: [ gcc, clang ]
+        build_type: [ Debug, Release ]
+        include:
+          # Extra sanitizer job on Linux.
+          - os: ubuntu-latest
+            compiler: gcc
+            build_type: Debug
+            sanitizer: true
+          # Static build on Linux.
+          - os: ubuntu-latest
+            compiler: gcc
+            build_type: Release
+            shared: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GMP (Linux)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgmp-dev
+
+      - name: Install GMP (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install gmp
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          compiler="${{ matrix.compiler }}"
+          cmake_args=(
+            -B build
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DBUILD_SHARED_LIBS=${{ matrix.shared != false }}
+            -DENABLE_SANITIZERS=${{ matrix.sanitizer == true }}
+            -DCMAKE_C_COMPILER="${compiler}"
+          )
+
+          if [[ "${{ matrix.os }}" == macos* ]]; then
+            cmake_args+=("-DCMAKE_PREFIX_PATH=$(brew --prefix gmp)")
+          fi
+
+          cmake "${cmake_args[@]}"
+
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }} --verbose
+
+      - name: Test
+        working-directory: build
+        run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+      - name: Install (test packaging)
+        if: matrix.build_type == 'Release'
+        run: sudo cmake --install build

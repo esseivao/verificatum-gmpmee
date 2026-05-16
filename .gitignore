@@ -19,6 +19,15 @@
 /Makefile.in
 /stamp-h1
 
+# CMake generated files
+/CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/CTestTestfile.cmake
+/DartConfiguration.tcl
+/Testing/
+/install_manifest.txt
+
 # Generated source/data files
 /.trialdiv.bstamp
 /trialdiv_32.c
