@@ -94,22 +94,40 @@ jobs:
             mingw-w64-x86_64-ninja
             mingw-w64-x86_64-python
 
+      - name: Inspect MinGW environment
+        shell: msys2 {0}
+        run: |
+          uname -a
+          which cmake
+          cmake --version
+          which gcc
+          gcc --version
+          echo "PATH=$PATH"
+          pacman -Q | grep -E 'mingw-w64-x86_64-(gcc|gmp|cmake|ninja|python)' || true
+
       - name: Configure CMake (MinGW-w64)
         shell: msys2 {0}
         run: |
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_SHARED_LIBS=ON \
-            -DCMAKE_C_COMPILER=gcc
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_VERBOSE_MAKEFILE=ON
 
       - name: Build
         shell: msys2 {0}
-        run: cmake --build build
+        run: cmake --build build --verbose
+
+      - name: Inspect MinGW build outputs
+        shell: msys2 {0}
+        run: |
+          find build -type f \( -name '*.exe' -o -name '*.dll' -o -name '*.a' \) -print
+          find build -name 'gmpmee.exe' -print -exec ldd {} \; || true
 
       - name: Test
         shell: msys2 {0}
         working-directory: build
-        run: ctest --output-on-failure
+        run: ctest --output-on-failure --verbose
 
   # ====================== 32-bit Legacy (ubuntu-22.04) ======================
   build-32bit-legacy:
