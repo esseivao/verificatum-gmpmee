@@ -22,9 +22,9 @@ jobs:
         compiler: [ gcc, clang ]
         build_type: [ Debug, Release ]
         include:
-          # Dedicated sanitizer job (only on Linux).
+          # Dedicated Clang sanitizer job (only on Linux).
           - os: ubuntu-latest
-            compiler: gcc
+            compiler: clang
             build_type: Debug
             sanitizer: true
 
@@ -106,6 +106,45 @@ jobs:
       - name: Test
         working-directory: build
         run: ctest --output-on-failure -C ${{ matrix.build_type }}
+
+  # ====================== Windows (MinGW-w64 GCC) ======================
+  windows-mingw:
+    name: Windows - MinGW-w64 GCC - Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 and GMP
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            git
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-gmp
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+
+      - name: Configure CMake (MinGW-w64)
+        shell: msys2 {0}
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_C_COMPILER=gcc
+
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build
+
+      - name: Test
+        shell: msys2 {0}
+        working-directory: build
+        run: ctest --output-on-failure
 
   # ====================== 32-bit Legacy (ubuntu-22.04) ======================
   build-32bit-legacy:

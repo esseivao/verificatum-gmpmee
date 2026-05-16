@@ -8,6 +8,12 @@ project(GMPMEE
 
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+# Keep multi-config generators such as Visual Studio from scattering
+# related runtime, library, and import-library artifacts unpredictably.
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
+
 # Options
 option(BUILD_SHARED_LIBS "Build shared library" ON)
 option(BUILD_TESTING "Build test/benchmark executable" ON)
@@ -137,6 +143,7 @@ set_target_properties(gmpmee PROPERTIES
     C_STANDARD 11
     C_STANDARD_REQUIRED ON
     C_EXTENSIONS OFF
+    WINDOWS_EXPORT_ALL_SYMBOLS ON
 )
 
 target_compile_options(gmpmee PRIVATE
@@ -150,7 +157,11 @@ target_compile_options(gmpmee PRIVATE
 if(BUILD_TESTING)
     add_executable(gmpmee_bin gmpmee.c)
     target_link_libraries(gmpmee_bin PRIVATE gmpmee)
-    set_target_properties(gmpmee_bin PROPERTIES OUTPUT_NAME "gmpmee")
+    set_target_properties(gmpmee_bin PROPERTIES
+        OUTPUT_NAME "gmpmee"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>"
+    )
+    add_dependencies(gmpmee_bin gmpmee)
 endif()
 
 # Sanitizers
