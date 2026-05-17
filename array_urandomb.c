@@ -19,15 +19,13 @@
 
 #include <gmp.h>
 
-#include <stdint.h>
-
 void
 gmpmee_array_urandomb(mpz_t *rop, size_t len, gmp_randstate_t state,
-     uint64_t n) {
+		   unsigned long int n) {
   size_t i;
 
   for (i = 0; i < len; i++)
     {
-      mpz_urandomb(rop[i], state, (mp_bitcnt_t) n);
+      mpz_urandomb(rop[i], state, n);
     }
 }
