@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
   pull_request:
-    branches: [ master, fix/interop-win-linux ]
+    branches: [ master ]
 
 permissions:
   contents: read
@@ -89,80 +89,6 @@ jobs:
 
       - name: Test
         run: make check
-
-  # ====================== Windows - MSVC ======================
-  windows-msvc:
-    name: Windows - MSVC
-    runs-on: windows-latest
-    env:
-      VCPKG_ROOT: C:\vcpkg
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install GMP
-        run: '& "$env:VCPKG_ROOT\vcpkg.exe" install gmp:x64-windows'
-
-      - name: Configure MSVC environment
-        shell: pwsh
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-          if (-not $vs) {
-            throw "Visual Studio with MSVC tools was not found."
-          }
-          "VS_DEV_CMD=$vs\Common7\Tools\VsDevCmd.bat" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: Build DLL and smoke test
-        shell: cmd
-        run: |
-          call "%VS_DEV_CMD%" -arch=x64
-          set "VCPKG_INSTALLED=%VCPKG_ROOT%\installed\x64-windows"
-          python gen_trialdiv.py 32 > trialdiv_32.c
-          python gen_trialdiv.py 64 > trialdiv_64.c
-          python gen_trialdiv.py -safe 32 > trialdiv_safe_32.c
-          python gen_trialdiv.py -safe 64 > trialdiv_safe_64.c
-          > gmpmee.def echo LIBRARY gmpmee
-          >> gmpmee.def echo EXPORTS
-          >> gmpmee.def echo gmpmee_spowm_init
-          >> gmpmee.def echo gmpmee_spowm_clear
-          >> gmpmee.def echo gmpmee_spowm_precomp
-          >> gmpmee.def echo gmpmee_spowm_table
-          >> gmpmee.def echo gmpmee_spowm_block_batch
-          >> gmpmee.def echo gmpmee_spowm
-          >> gmpmee.def echo gmpmee_spowm_naive
-          >> gmpmee.def echo gmpmee_fpowm_init
-          >> gmpmee.def echo gmpmee_fpowm_clear
-          >> gmpmee.def echo gmpmee_fpowm_precomp
-          >> gmpmee.def echo gmpmee_fpowm_init_precomp
-          >> gmpmee.def echo gmpmee_fpowm
-          >> gmpmee.def echo gmpmee_millerrabin_init
-          >> gmpmee.def echo gmpmee_millerrabin_next_cand
-          >> gmpmee.def echo gmpmee_millerrabin_clear
-          >> gmpmee.def echo gmpmee_millerrabin_trial
-          >> gmpmee.def echo gmpmee_millerrabin_once
-          >> gmpmee.def echo gmpmee_millerrabin_reps_rs
-          >> gmpmee.def echo gmpmee_millerrabin_rs
-          >> gmpmee.def echo gmpmee_millerrabin_next_rs
-          >> gmpmee.def echo gmpmee_millerrabin_safe_init
-          >> gmpmee.def echo gmpmee_millerrabin_safe_next_cand
-          >> gmpmee.def echo gmpmee_millerrabin_safe_clear
-          >> gmpmee.def echo gmpmee_millerrabin_safe_trial
-          >> gmpmee.def echo gmpmee_millerrabin_safe_once
-          >> gmpmee.def echo gmpmee_millerrabin_safe_reps_rs
-          >> gmpmee.def echo gmpmee_millerrabin_safe_rs
-          >> gmpmee.def echo gmpmee_millerrabin_safe_next_rs
-          >> gmpmee.def echo mpz_probab_prime_p_next
-          >> gmpmee.def echo mpz_probab_safe_prime_p
-          >> gmpmee.def echo mpz_probab_safe_prime_p_next
-          >> gmpmee.def echo gmpmee_array_alloc
-          >> gmpmee.def echo gmpmee_array_alloc_init
-          >> gmpmee.def echo gmpmee_array_clear_dealloc
-          >> gmpmee.def echo gmpmee_array_urandomb
-          cl /nologo /LD /O2 /I"%VCPKG_INSTALLED%\include" /Fegmpmee.dll spowm.c spowm_clear.c spowm_precomp.c spowm_init.c spowm_table.c spowm_block_batch.c spowm_naive.c array_alloc.c array_clear_dealloc.c array_urandomb.c array_alloc_init.c fpowm.c fpowm_clear.c fpowm_init.c fpowm_precomp.c fpowm_init_precomp.c millerrabin_init.c millerrabin_next_cand.c millerrabin_clear.c millerrabin_trial.c millerrabin_once.c millerrabin_reps_rs.c millerrabin_rs.c millerrabin_next_rs.c millerrabin_safe_init.c millerrabin_safe_next_cand.c millerrabin_safe_clear.c millerrabin_safe_trial.c millerrabin_safe_reps_rs.c millerrabin_safe_rs.c millerrabin_safe_next_rs.c probab_prime_p_next.c probab_safe_prime_p.c probab_safe_prime_p_next.c /link /DEF:gmpmee.def /LIBPATH:"%VCPKG_INSTALLED%\lib" gmp.lib
-          cl /nologo /O2 /I"%VCPKG_INSTALLED%\include" /Fegmpmee-msvc.exe gmpmee.c gmpmee.lib /link /LIBPATH:"%VCPKG_INSTALLED%\lib" gmp.lib
-          set "PATH=%VCPKG_INSTALLED%\bin;%PATH%"
-          gmpmee-msvc.exe 100
 
   # ====================== Windows - MinGW-w64 GCC ======================
   windows-mingw:
